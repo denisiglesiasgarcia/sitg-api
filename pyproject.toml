@@ -3,7 +3,7 @@ name = "sitg-api"
 version = "0.1.0"
 description = "Client générique pour les APIs ArcGIS REST SITG"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
     "geopandas>=1.1.3",
     "ipykernel>=7.2.0",
