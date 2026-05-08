@@ -1,6 +1,6 @@
 # sitg-api
 
-Client Python pour les APIs ArcGIS REST du SITG (Genève) — pagination parallèle, retry automatique.
+Client Python pour les APIs ArcGIS REST du SITG (Genève).
 
 ## Installation
 
