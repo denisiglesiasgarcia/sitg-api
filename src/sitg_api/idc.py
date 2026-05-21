@@ -239,23 +239,23 @@ class IDCFetcher:
         self._log_egid_coverage(df, set(egid_list))
 
         # Niveau 2 : validation dataframely — retour direct du FilterResult sans déballer
-        filter_result = IDCSchema.filter(df, cast=False)
+        df_valid, failures = IDCSchema.filter(df, cast=False)
 
-        if len(filter_result.failure):
+        if len(failures):
             logger.warning(
                 "IDCFetcher.fetch : %d ligne(s) invalide(s) selon IDCSchema — %s",
-                len(filter_result.failure),
-                filter_result.failure.counts(),
+                len(failures),
+                failures.counts(),
             )
 
         logger.info(
             "IDCFetcher.fetch : %d lignes valides / %d EGIDs couverts / %d demandés",
-            len(filter_result.good),
-            filter_result.good["egid"].n_unique(),
+            len(df_valid),
+            df_valid["egid"].n_unique(),
             len(egid_list),
         )
 
-        return filter_result.good, filter_result.failure
+        return df_valid, failures
 
     # --- Méthodes privées ---
 
