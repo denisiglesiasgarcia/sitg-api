@@ -216,7 +216,24 @@ class IDCFetcher:
         Retourne un tuple (df_valide, failures).
         Lève RuntimeError si aucune donnée, ValueError si le contrat API est rompu.
         """
-        egid_list = list(set(egid)) if isinstance(egid, list) else [egid]
+        egid_list = egid if isinstance(egid, list) else [egid]
+
+        # Validation des types en entrée — rejette silencieusement les non-entiers
+        invalid = [v for v in egid_list if not isinstance(v, int)]
+        if invalid:
+            logger.warning(
+                "IDCFetcher.fetch : %d valeur(s) ignorée(s) — type non entier : %s",
+                len(invalid),
+                invalid,
+            )
+
+        egid_list = list({v for v in egid_list if isinstance(v, int)})
+
+        if not egid_list:
+            raise ValueError(
+                "Aucun EGID valide fourni — tous les éléments doivent être des entiers."
+            )
+
         logger.debug("IDCFetcher.fetch : %d EGIDs uniques demandés", len(egid_list))
 
         features = self._fetch_raw(
