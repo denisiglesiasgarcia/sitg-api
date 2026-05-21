@@ -182,7 +182,7 @@ def fetch_idc_data(
 
         df = (
             pl
-            .from_dicts([f["attributes"] for f in features], schema_infer_length=None)
+            .from_dicts([f["attributes"] for f in features], infer_schema_length=None)
             .rename(_RENAME)
             .select(RESULT_COLUMNS)
             .with_columns(
