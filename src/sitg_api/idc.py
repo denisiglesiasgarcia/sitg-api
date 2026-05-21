@@ -35,6 +35,8 @@ from ._arcgis import fetch_all
 logger = logging.getLogger(__name__)
 
 # Plages valides — invariants métier IDC (module-level pour les règles dy.rule)
+_EGID_MIN: int = 10000
+_EGID_MAX: int = 999_999_999  # https://www.bfs.admin.ch/bfs/fr/home/registres/registre-personnes/harmonisation-registres/egid-ewid.html
 _ANNEE_MIN: int = 2000
 _ANNEE_MAX: int = datetime.date.today().year + 1  # marge d'un an dans le futur
 _NPA_MIN: int = 1000  # NPA suisse : 4 chiffres, Lausanne = 1000
@@ -98,6 +100,11 @@ class IDCSchema(dy.Schema):
     nbre_preneur = dy.Int64(nullable=True)
 
     # --- Règles métier ---
+
+    @dy.rule()
+    def egid_valide(cls) -> pl.Expr:
+        # IDC en kWh/m²/an — toujours strictement positif physiquement
+        return pl.col("egid").is_between(_EGID_MIN, _EGID_MAX)
 
     @dy.rule()
     def indice_positif(cls) -> pl.Expr:
@@ -238,7 +245,7 @@ class IDCFetcher:
 
         self._log_egid_coverage(df, set(egid_list))
 
-        # Niveau 2 : validation dataframely — retour direct du FilterResult sans déballer
+        # Niveau 2 : validation dataframely
         df_valid, failures = IDCSchema.filter(df, cast=False)
 
         if len(failures):
