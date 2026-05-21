@@ -1,5 +1,5 @@
 """
-Module IDC — Indice de Dépense Calorifique (SITG / SCANE).
+Module IDC — Indice de Dépense de Chaleur.
 
 Fournit :
   - EXPECTED_SCHEMA, NULLABLE_COLUMNS : référence du schéma
@@ -131,6 +131,7 @@ def fetch_idc_data(
     *,
     url: str = URL_IDC,
     chunk_size: int = 1000,
+    egid_chunk_size: int = 50,  # nb max d'EGIDs par clause IN
     progress_cb: Callable[[float], None] | None = None,
     status_cb: Callable[[str], None] | None = None,
 ) -> pl.DataFrame | None:
@@ -148,21 +149,33 @@ def fetch_idc_data(
     progress_cb : callback(float 0→1)
     status_cb   : callback(str) pour messages
     """
-    where = (
-        f"EGID IN ({','.join(map(str, egid))})"
-        if isinstance(egid, list)
-        else f"EGID={egid}"
-    )
+    # Normalisation en liste unique (dédoublonnage avant envoi)
+    egid_list = list(set(egid)) if isinstance(egid, list) else [egid]
+
+    # Découpage en chunks pour éviter les URLs trop longues → erreur 406
+    chunks = [
+        egid_list[i : i + egid_chunk_size]
+        for i in range(0, len(egid_list), egid_chunk_size)
+    ]
 
     try:
-        features = fetch_all(
-            url,
-            fields=",".join(_API_COLUMNS),
-            where=where,
-            chunk_size=chunk_size,
-            progress_cb=progress_cb,
-            status_cb=status_cb,
-        )
+        features = []
+        for chunk in chunks:
+            where = (
+                f"EGID IN ({','.join(map(str, chunk))})"
+                if len(chunk) > 1
+                else f"EGID={chunk[0]}"
+            )
+            chunk_features = fetch_all(
+                url,
+                fields=",".join(_API_COLUMNS),
+                where=where,
+                chunk_size=chunk_size,
+                progress_cb=progress_cb,
+                status_cb=status_cb,
+            )
+            if chunk_features:
+                features.extend(chunk_features)
 
         if not features:
             return None
@@ -173,7 +186,7 @@ def fetch_idc_data(
             .rename(_RENAME)
             .select(RESULT_COLUMNS)
             .with_columns(
-                # Entiers — l'API renvoie parfois Float64
+                # Int64
                 pl.col(
                     "egid",
                     "annee",
@@ -185,7 +198,7 @@ def fetch_idc_data(
                     "id_concessionnaire",
                     "nbre_preneur",
                 ).cast(pl.Int64),
-                # Flottants
+                # Floats
                 pl.col(
                     "quantite_agent_energetique_1",
                     "quantite_agent_energetique_2",
@@ -196,7 +209,7 @@ def fetch_idc_data(
                     pl.Datetime("ms")
                 ),
             )
-            # Conserver uniquement la saisie la plus récente par (egid, annee)
+            # Dedup par (egid, annee)
             .sort(["egid", "annee", "date_saisie"], descending=[False, False, True])
             .unique(subset=["egid", "annee"], keep="first")
             .sort(["egid", "annee"])
