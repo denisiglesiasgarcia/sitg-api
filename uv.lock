@@ -306,6 +306,24 @@ wheels = [
 ]
 
 [[package]]
+name = "dataframely"
+version = "2.9.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fsspec" },
+    { name = "numpy" },
+    { name = "polars" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e1/8e/e58ad5c3ab3d3f09a4d3cc49ba066c6f41b716b8a2d88b35ec7bc7d2e0f8/dataframely-2.9.1.tar.gz", hash = "sha256:450dc40f9c7d442e5493db45ece18861c0609ff12b0df4ac32c05b47f543978c", size = 422790, upload-time = "2026-04-14T23:14:48.733Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fc/e0/0f432cf872dbeeb5e2b3f24aff0b9f4120367e33f575f35491e9cb4d7d72/dataframely-2.9.1-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:37c365860eb7bf3e10c24f9f04af6c217c0b91e7611070334152f23487c79708", size = 5361724, upload-time = "2026-04-14T23:14:39.857Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/c4/445984e535e6f9e7ae9be0557d91b0a60af8a4d13d04fdf0b5938845d351/dataframely-2.9.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:5dfa28f36151aabe4f42683766660741e8824cd5d29d4c061284681aa796ec43", size = 4998978, upload-time = "2026-04-14T23:14:42.115Z" },
+    { url = "https://files.pythonhosted.org/packages/62/ca/2632f806f430adc8af37a6fa7c809c6e20487a5d480d01e8a6dca2c28744/dataframely-2.9.1-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:fb73dc25bc288ef177a0499d9a9bb34e9538238681b6351d926d7c1df49470c9", size = 5275728, upload-time = "2026-04-14T23:14:43.755Z" },
+    { url = "https://files.pythonhosted.org/packages/59/0d/bd6ac8608749658e4f46ee2af31ba18717eb38a5815c5e594caf8d51335f/dataframely-2.9.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d040e432944632e3ebdbb97710ec54f2abac4cc0fb8c4ca1e0eaa9612426a114", size = 5600592, upload-time = "2026-04-14T23:14:45.702Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/ac/495db153170034549ffbb4b4edbb264309f21c7078afa42d37ddb96881fd/dataframely-2.9.1-cp310-abi3-win_amd64.whl", hash = "sha256:4c6f79012a3f1388f6c53c2b991e03f26b4c58bbc0d6055a585342c4bbc093bf", size = 5617432, upload-time = "2026-04-14T23:14:47.279Z" },
+]
+
+[[package]]
 name = "debugpy"
 version = "1.8.20"
 source = { registry = "https://pypi.org/simple" }
@@ -395,6 +413,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/34/3b/214dcc19ee31d3d38fb5ad2755c11ef0514e5dc300bbaf41c0b69f393799/fonttools-4.63.0-cp314-cp314t-win32.whl", hash = "sha256:948428a275741f0b64b113c955425a953314f4b9ab9997f73a72c83e68e569c8", size = 2359326, upload-time = "2026-05-14T12:04:24.22Z" },
     { url = "https://files.pythonhosted.org/packages/dd/1e/3ff1a9b523058c2eeb6a9d50f5574e2a738200d0d94107d5bc4105e8da3f/fonttools-4.63.0-cp314-cp314t-win_amd64.whl", hash = "sha256:6d4741eb179121cab9eea4cb2393d24492373a260d7945006358c08cfbf45419", size = 2425829, upload-time = "2026-05-14T12:04:26.829Z" },
     { url = "https://files.pythonhosted.org/packages/2c/47/c99d5268f354002ce80f8d029cd9d7d872969da1de8b93d32de4dc56d6f4/fonttools-4.63.0-py3-none-any.whl", hash = "sha256:445af2eab030a16b9171ea8bdda7ebf7d96bda2df88ee182a464252f6e05e20d", size = 1164562, upload-time = "2026-05-14T12:04:29.092Z" },
+]
+
+[[package]]
+name = "fsspec"
+version = "2026.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/8d/1c51c094345df128ca4a990d633fe1a0ff28726c9e6b3c41ba65087bba1d/fsspec-2026.4.0.tar.gz", hash = "sha256:301d8ac70ae90ef3ad05dcf94d6c3754a097f9b5fe4667d2787aa359ec7df7e4", size = 312760, upload-time = "2026-04-29T20:42:38.635Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d5/0c/043d5e551459da400957a1395e0febbf771446ff34291afcbe3d8be2a279/fsspec-2026.4.0-py3-none-any.whl", hash = "sha256:11ef7bb35dab8a394fde6e608221d5cf3e8499401c249bebaeaad760a1a8dec2", size = 203402, upload-time = "2026-04-29T20:42:36.842Z" },
 ]
 
 [[package]]
@@ -1405,6 +1432,7 @@ name = "sitg-api"
 version = "0.1.2"
 source = { editable = "." }
 dependencies = [
+    { name = "dataframely" },
     { name = "geopandas" },
     { name = "ipykernel" },
     { name = "ipywidgets" },
@@ -1418,6 +1446,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dataframely", specifier = ">=2.9.1" },
     { name = "geopandas", specifier = ">=1.1.3" },
     { name = "ipykernel", specifier = ">=7.2.0" },
     { name = "ipywidgets", specifier = ">=8.1.8" },
