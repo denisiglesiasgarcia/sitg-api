@@ -202,81 +202,60 @@ class IDCFetcher:
         *,
         progress_cb: Callable[[float], None] | None = None,
         status_cb: Callable[[str], None] | None = None,
-    ) -> tuple[dy.DataFrame[IDCSchema], dy.FailureInfo] | None:
+    ) -> tuple[dy.DataFrame[IDCSchema], dy.FailureInfo]:
         """
         Récupère, transforme et valide les données IDC pour un ou plusieurs EGIDs.
 
-        Retourne un tuple (df_valide, failures) ou None si aucune donnée ou erreur.
-
-        Les lignes invalides selon IDCSchema sont isolées dans failures — elles ne sont
-        pas supprimées silencieusement. L'appelant peut les inspecter via failures.counts()
-        ou failures.invalid().
-
-        Paramètres
-        ----------
-        egid        : EGID unique ou liste d'EGIDs
-        progress_cb : callback(float 0→1) pour barres de progression
-        status_cb   : callback(str) pour messages utilisateur (ex: Streamlit)
+        Retourne un tuple (df_valide, failures).
+        Lève RuntimeError si aucune donnée, ValueError si le contrat API est rompu.
         """
         egid_list = list(set(egid)) if isinstance(egid, list) else [egid]
         logger.debug("IDCFetcher.fetch : %d EGIDs uniques demandés", len(egid_list))
 
-        try:
-            features = self._fetch_raw(
-                egid_list, progress_cb=progress_cb, status_cb=status_cb
-            )
-            if features is None:
-                return None
+        features = self._fetch_raw(
+            egid_list, progress_cb=progress_cb, status_cb=status_cb
+        )
 
-            df_raw = pl.from_dicts(
-                data=[f["attributes"] for f in features],
-                infer_schema_length=None,  # scan complet — colonnes creuses (agents 2/3)
-            )
+        # features may be None or contain None entries; guard against that
+        safe_features = features or []
+        df_raw = pl.from_dicts(
+            data=[f["attributes"] for f in safe_features if f and "attributes" in f],
+            infer_schema_length=None,
+        )
 
-            # Niveau 1 : contrat API — bloquant, lève ValueError si colonnes incorrectes
-            self._check_api_columns(df_raw)
+        # Niveau 1 : contrat API — bloquant
+        self._check_api_columns(df_raw)
 
-            df = self._transform(df_raw)
-            df, n_dedup = self._dedup(df)
+        df = self._transform(df_raw)
+        df, n_dedup = self._dedup(df)
 
-            if n_dedup:
-                logger.info(
-                    "IDCFetcher.fetch : %d doublon(s) supprimé(s) "
-                    "(même EGID + même année, entrée la plus récente conservée)",
-                    n_dedup,
-                )
-
-            # Log de couverture — EGIDs demandés sans aucune donnée IDC
-            self._log_egid_coverage(df, set(egid_list))
-
-            # Niveau 2 : validation dataframely (types + règles métier)
-            # filter() = soft validation : conserve les lignes valides, isole les autres
-            df_valid, failures = IDCSchema.filter(df, cast=False)
-
-            if len(failures):
-                logger.warning(
-                    "IDCFetcher.fetch : %d ligne(s) invalide(s) selon IDCSchema — %s",
-                    len(failures),
-                    failures.counts(),
-                )
-
+        if n_dedup:
             logger.info(
-                "IDCFetcher.fetch : %d lignes valides / %d EGIDs couverts / %d demandés",
-                len(df_valid),
-                df_valid["egid"].n_unique(),
-                len(egid_list),
+                "IDCFetcher.fetch : %d doublon(s) supprimé(s) "
+                "(même EGID + même année, entrée la plus récente conservée)",
+                n_dedup,
             )
 
-            return df_valid, failures
+        self._log_egid_coverage(df, set(egid_list))
 
-        except ValueError as e:
-            # Contrat API rompu — inutile de retry, corriger _API_COLUMNS
-            logger.error("IDCFetcher.fetch : contrat API rompu — %s", e)
-            return None
-        except Exception as e:
-            # Erreur réseau ou parsing inattendue
-            logger.error("IDCFetcher.fetch : erreur inattendue — %s", e, exc_info=True)
-            return None
+        # Niveau 2 : validation dataframely — retour direct du FilterResult sans déballer
+        filter_result = IDCSchema.filter(df, cast=False)
+
+        if len(filter_result.failure):
+            logger.warning(
+                "IDCFetcher.fetch : %d ligne(s) invalide(s) selon IDCSchema — %s",
+                len(filter_result.failure),
+                filter_result.failure.counts(),
+            )
+
+        logger.info(
+            "IDCFetcher.fetch : %d lignes valides / %d EGIDs couverts / %d demandés",
+            len(filter_result.good),
+            filter_result.good["egid"].n_unique(),
+            len(egid_list),
+        )
+
+        return filter_result.good, filter_result.failure
 
     # --- Méthodes privées ---
 
@@ -286,10 +265,10 @@ class IDCFetcher:
         *,
         progress_cb: Callable[[float], None] | None,
         status_cb: Callable[[str], None] | None,
-    ) -> list[dict] | None:
+    ) -> list[dict]:
         """
         Appels API paginés, découpés en chunks d'EGIDs.
-        Retourne None si aucun résultat (non bloquant — bâtiments non assujettis).
+        Lève RuntimeError si aucun résultat retourné.
         """
         chunks = [
             egid_list[i : i + self.egid_chunk_size]
@@ -315,12 +294,10 @@ class IDCFetcher:
                 features.extend(chunk_features)
 
         if not features:
-            logger.warning(
-                "IDCFetcher._fetch_raw : aucun résultat pour %d EGIDs — "
-                "bâtiments non assujettis à l'IDC ou hors périmètre Genève ?",
-                len(egid_list),
+            raise RuntimeError(
+                f"Aucune donnée IDC pour les {len(egid_list)} EGIDs demandés — "
+                "bâtiments non assujettis à l'IDC ou hors périmètre Genève ?"
             )
-            return None
 
         return features
 
