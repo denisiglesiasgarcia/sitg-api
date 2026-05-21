@@ -91,8 +91,12 @@ Retourne directement un `pl.DataFrame` avec colonnes en minuscules, types casté
 ```python
 from sitg_api.idc import fetch_idc_data
 
-df = fetch_idc_data(egid=[1015054, 1015052])
+df, failures = fetch_idc_data(egid=[1015054, 1015052])
 
+# Erreurs de validation
+if len(failures) > 0:
+    display(failures.counts())
+   
 print(df)
 ```
 
