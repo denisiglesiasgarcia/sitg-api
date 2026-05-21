@@ -428,4 +428,12 @@ def fetch_idc_data(
         chunk_size=chunk_size,
         egid_chunk_size=egid_chunk_size,
     )
-    return fetcher.fetch(egid, progress_cb=progress_cb, status_cb=status_cb)
+    df, failures = fetcher.fetch(egid, progress_cb=progress_cb, status_cb=status_cb)
+    if len(failures) > 0:
+        logger.warning(
+            "fetch_idc_data : %d ligne(s) invalide(s) selon IDCSchema — %s",
+            len(failures),
+            failures.counts(),
+        )
+        raise ValueError(f"{len(failures)} ligne(s) invalide(s), vérifier schéma.")
+    return df, failures
