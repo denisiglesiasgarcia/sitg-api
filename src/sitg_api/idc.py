@@ -57,8 +57,8 @@ class IDCSchema(dy.Schema):
     """
 
     # --- Identifiants ---
-    egid = dy.Int64(nullable=False, min_length=5)
-    annee = dy.Int64(nullable=False, min_length=4)
+    egid = dy.Int64(nullable=False)
+    annee = dy.Int64(nullable=False)
 
     # --- Indicateurs énergétiques ---
     indice = dy.Int64(nullable=False)
@@ -66,7 +66,7 @@ class IDCSchema(dy.Schema):
 
     # --- Adresse ---
     adresse = dy.String(nullable=False)
-    npa = dy.Int64(nullable=False, min_length=4)
+    npa = dy.Int64(nullable=False)
     commune = dy.String(nullable=False)
     destination = dy.String(nullable=False)
 
