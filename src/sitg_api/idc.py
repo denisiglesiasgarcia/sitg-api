@@ -25,6 +25,7 @@ Conventions importantes
 
 import datetime
 import logging
+import re
 from collections.abc import Callable
 
 import dataframely as dy
@@ -437,3 +438,76 @@ def fetch_idc_data(
         )
         raise ValueError(f"{len(failures)} ligne(s) invalide(s), vérifier schéma.")
     return df, failures
+
+
+# ---------------------------------------------
+# Pivot par EGID
+# ---------------------------------------------
+
+
+# All value columns to pivot
+def pivot_data_idc_an(df: pl.DataFrame) -> pl.DataFrame:
+    value_cols = [
+        "nbre_preneur",
+        "sre",
+        "indice",
+        "adresse",
+        "date_debut_periode",
+        "date_fin_periode",
+        "agent_energetique_1",
+        "quantite_agent_energetique_1",
+        "unite_agent_energetique_1",
+        "agent_energetique_2",
+        "quantite_agent_energetique_2",
+        "unite_agent_energetique_2",
+        "agent_energetique_3",
+        "quantite_agent_energetique_3",
+        "unite_agent_energetique_3",
+    ]
+
+    df_pivot_idc_an = df.pivot(
+        index="egid",
+        on="annee",
+        values=value_cols,
+        aggregate_function="first",
+    )
+
+    non_index = [c for c in df_pivot_idc_an.columns if c != "egid"]
+
+    # Sort by (variable_name, year) — groups all years per variable, chronologically
+    sorted_cols = sorted(
+        non_index,
+        key=lambda c: (re.sub(r"_\d{4}$", "", c), re.search(r"(\d{4})$", c).group(1)),
+    )
+
+    df_pivot_idc_an = df_pivot_idc_an.select(["egid"] + sorted_cols)
+
+    return df_pivot_idc_an
+
+
+def fetch_idc_data_pivot_egid(
+    egid: int | list[int],
+    *,
+    url: str = IDCFetcher.URL_DEFAULT,
+    chunk_size: int = 1000,
+    egid_chunk_size: int = 50,
+    progress_cb: Callable[[float], None] | None = None,
+    status_cb: Callable[[str], None] | None = None,
+) -> pl.DataFrame:
+
+    fetcher = IDCFetcher(
+        url=url,
+        chunk_size=chunk_size,
+        egid_chunk_size=egid_chunk_size,
+    )
+    df, failures = fetcher.fetch(egid, progress_cb=progress_cb, status_cb=status_cb)
+    if len(failures) > 0:
+        logger.warning(
+            "fetch_idc_data : %d ligne(s) invalide(s) selon IDCSchema — %s",
+            len(failures),
+            failures.counts(),
+        )
+        raise ValueError(f"{len(failures)} ligne(s) invalide(s), vérifier schéma.")
+    df_pivot_idc_an: pl.DataFrame = pivot_data_idc_an(df)
+
+    return df_pivot_idc_an
