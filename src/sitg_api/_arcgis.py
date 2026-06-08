@@ -94,11 +94,19 @@ def _fetch_page(
                     "f": "json",
                     "resultOffset": offset,
                     "resultRecordCount": chunk_size,
+                    "resultType": "standard",
                 },
                 timeout=timeout,
             )
             r.raise_for_status()
-            return r.json().get("features", [])
+            data = r.json()
+            if data.get("exceededTransferLimit"):
+                logger.warning(
+                    "exceededTransferLimit at offset=%d — server capped the page; "
+                    "reduce chunk_size or some records may be missing",
+                    offset,
+                )
+            return data.get("features", [])
         except requests.exceptions.RequestException:
             if attempt == max_retries - 1:
                 raise
@@ -147,7 +155,7 @@ def fetch_all(
     fields: str = "*",
     where: str = "1=1",
     with_geometry: bool = False,
-    chunk_size: int = 1000,
+    chunk_size: int = 2000,
     max_workers: int = 4,
     timeout: int = 120,
     max_retries: int = 4,
@@ -164,7 +172,7 @@ def fetch_all(
     fields       : champs à retourner, ex. "ID,NOM" ou "*"
     where        : filtre SQL, ex. "COMMUNE='Genève'" (défaut: tout)
     with_geometry: inclure la géométrie brute dans chaque feature
-    chunk_size   : nombre de features par requête (max serveur: souvent 1000 ou 2000)
+    chunk_size   : features par requête; resultType=standard permet des valeurs élevées (ex. 5000–32000)
     max_workers  : parallélisme des requêtes HTTP
     timeout      : timeout HTTP en secondes
     max_retries  : tentatives max par page avant exception
