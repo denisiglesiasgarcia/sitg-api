@@ -4,13 +4,17 @@ on:
   push:
   pull_request:
 
+env:
+  # workaround for Node.js 20 actions are deprecated"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   # ── 1. Lint & format ──────────────────────────────────────────────────────
   lint:
     name: Lint & Format (ruff)
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed to push autofix commits back to the branch
+      contents: write # needed to push autofix commits back to the branch
 
     steps:
       - uses: actions/checkout@v4
