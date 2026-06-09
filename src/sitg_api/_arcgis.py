@@ -16,6 +16,29 @@ from tqdm.auto import tqdm
 logger = logging.getLogger(__name__)
 
 
+def get_layer_info(url: str, timeout: int = 30) -> dict:
+    """Retourne les métadonnées du layer ArcGIS (GET /FeatureServer/0).
+
+    Paramètres
+    ----------
+    url : str
+        Endpoint du layer — avec ou sans suffixe ``/query``.
+    timeout : int
+        Timeout HTTP en secondes.
+
+    Retourne
+    --------
+    dict
+        Métadonnées brutes, incluant ``maxRecordCount``,
+        ``standardMaxRecordCount``, ``tileMaxRecordCount`` et
+        ``maxRecordCountFactor``.
+    """
+    base_url = url.removesuffix("/query")
+    resp = requests.get(base_url, params={"f": "json"}, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def get_count(url: str, where: str = "1=1", timeout: int = 30) -> int:
     """Retourne le nombre total de features pour une requête ArcGIS.
 
@@ -101,10 +124,10 @@ def _fetch_page(
             r.raise_for_status()
             data = r.json()
             if data.get("exceededTransferLimit"):
-                logger.warning(
-                    "exceededTransferLimit at offset=%d — server capped the page; "
-                    "reduce chunk_size or some records may be missing",
-                    offset,
+                raise RuntimeError(
+                    f"exceededTransferLimit at offset={offset}: server truncated the page "
+                    f"(chunk_size={chunk_size} exceeds server limit). "
+                    "Pass a smaller chunk_size or leave it as None for auto-detection."
                 )
             return data.get("features", [])
         except requests.exceptions.RequestException:
@@ -155,7 +178,7 @@ def fetch_all(
     fields: str = "*",
     where: str = "1=1",
     with_geometry: bool = False,
-    chunk_size: int = 2000,
+    chunk_size: int | None = None,
     max_workers: int = 4,
     timeout: int = 120,
     max_retries: int = 4,
@@ -172,7 +195,9 @@ def fetch_all(
     fields       : champs à retourner, ex. "ID,NOM" ou "*"
     where        : filtre SQL, ex. "COMMUNE='Genève'" (défaut: tout)
     with_geometry: inclure la géométrie brute dans chaque feature
-    chunk_size   : features par requête; resultType=standard permet des valeurs élevées (ex. 5000–32000)
+    chunk_size   : features par requête. Si None (défaut), lu automatiquement depuis
+                   les métadonnées du layer (standardMaxRecordCount × maxRecordCountFactor),
+                   ce qui correspond au maximum autorisé par le serveur avec resultType=standard.
     max_workers  : parallélisme des requêtes HTTP
     timeout      : timeout HTTP en secondes
     max_retries  : tentatives max par page avant exception
@@ -186,6 +211,12 @@ def fetch_all(
       - "attributes" : dict des valeurs de champs
       - "geometry"   : dict brut ArcGIS (seulement si with_geometry=True)
     """
+    if chunk_size is None:
+        info = get_layer_info(url, timeout=30)
+        factor = info.get("maxRecordCountFactor", 1.0)
+        chunk_size = int(info.get("standardMaxRecordCount", 2000) * factor)
+        logger.info("chunk_size auto-détecté: %d (standardMaxRecordCount × maxRecordCountFactor)", chunk_size)
+
     total = get_count(url, where, timeout=30)
 
     if status_cb:

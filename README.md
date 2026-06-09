@@ -157,12 +157,23 @@ print(df_pivot_idc_an.head(2))
 
 ## Paramètres de `fetch_all`
 
-| Paramètre      | Défaut  | Description                                      |
-|----------------|---------|--------------------------------------------------|
-| `fields`       | `"*"`   | Champs à retourner, ex. `"ID,NOM"`               |
-| `where`        | `"1=1"` | Filtre SQL, ex. `"COMMUNE='Genève'"`             |
-| `with_geometry`| `False` | Inclure la géométrie brute dans chaque feature   |
-| `chunk_size`   | `1000`  | Features par requête (max serveur SITG)          |
-| `max_workers`  | `4`     | Parallélisme des requêtes HTTP                   |
-| `timeout`      | `120`   | Timeout HTTP en secondes                         |
-| `max_retries`  | `4`     | Tentatives max par page avant exception          |
+| Paramètre      | Défaut  | Description                                                                                      |
+|----------------|---------|--------------------------------------------------------------------------------------------------|
+| `fields`       | `"*"`   | Champs à retourner, ex. `"ID,NOM"`                                                               |
+| `where`        | `"1=1"` | Filtre SQL, ex. `"COMMUNE='Genève'"`                                                             |
+| `with_geometry`| `False` | Inclure la géométrie brute dans chaque feature                                                   |
+| `chunk_size`   | `None`  | Features par requête. `None` = auto-détection depuis les métadonnées du layer (`standardMaxRecordCount × maxRecordCountFactor`) |
+| `max_workers`  | `4`     | Parallélisme des requêtes HTTP                                                                   |
+| `timeout`      | `120`   | Timeout HTTP en secondes                                                                         |
+| `max_retries`  | `4`     | Tentatives max par page avant exception                                                          |
+
+### Métadonnées du layer
+
+```python
+from sitg_api import get_layer_info
+
+info = get_layer_info(URL)
+print(info["maxRecordCount"])          # limite sans resultType
+print(info["standardMaxRecordCount"]) # limite avec resultType=standard (utilisée par fetch_all)
+print(info["maxRecordCountFactor"])    # multiplicateur configuré côté serveur
+```
