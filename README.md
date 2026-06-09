@@ -36,7 +36,8 @@ URL = "https://vector.sitg.ge.ch/arcgis/rest/services/SCANE_INDICE_MOYENNES_3_AN
 from sitg_api import get_count
 
 print(f"Total: {get_count(URL)}")
-print(f"Genève: {get_count(URL, where='COMMUNE=\'Genève\'')}")
+commune = "COMMUNE='Genève'"
+print(f"Genève: {get_count(URL, where=commune)}")
 ```
 
 ```python
@@ -49,17 +50,11 @@ Genève: 95540
 #### Sans géométrie
 
 ```python
-import os
-
 import polars as pl
 
 from sitg_api import fetch_all
 
-features = fetch_all(
-    URL,
-    with_geometry=False,
-    max_workers=os.cpu_count() - 1,  # default 4
-)
+features = fetch_all(URL, with_geometry=False)
 df = pl.from_dicts([f["attributes"] for f in features], infer_schema_length=None)
 print(df.head(2))
 ```
@@ -72,18 +67,12 @@ print(df.head(2))
 #### Avec géométrie
 
 ```python
-import os
-
 import geopandas as gpd
 from shapely.geometry import Polygon
 
 from sitg_api import fetch_all
 
-features_geom = fetch_all(
-    URL,
-    with_geometry=True,
-    max_workers=os.cpu_count() - 1,  # default 4
-)
+features_geom = fetch_all(URL, with_geometry=True)
 gdf = gpd.GeoDataFrame(
     [f["attributes"] for f in features_geom],
     geometry=[Polygon(f["geometry"]["rings"][0]) for f in features_geom],

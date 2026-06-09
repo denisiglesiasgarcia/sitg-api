@@ -57,9 +57,9 @@ class TestGetLayerInfo:
         assert "name" in info
 
     def test_unreachable_host_raises(self):
-        import requests
+        import httpx
 
-        with pytest.raises(requests.exceptions.ConnectionError):
+        with pytest.raises(httpx.ConnectError):
             get_layer_info(
                 "https://does-not-exist.sitg.invalid/arcgis/rest/services/X/FeatureServer/0"
             )

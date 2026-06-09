@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import requests
+import httpx
 from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ def get_layer_info(url: str, timeout: int = 30) -> dict:
         ``maxRecordCountFactor``.
     """
     base_url = url.removesuffix("/query")
-    resp = requests.get(base_url, params={"f": "json"}, timeout=timeout)
+    resp = httpx.get(base_url, params={"f": "json"}, timeout=timeout)
     resp.raise_for_status()
     return resp.json()
 
@@ -68,7 +68,7 @@ def get_count(url: str, where: str = "1=1", timeout: int = 30) -> int:
     int
         Nombre total d'enregistrements correspondants.
     """
-    resp = requests.get(
+    resp = httpx.get(
         url,
         params={"where": where, "returnCountOnly": "true", "f": "json"},
         timeout=timeout,
@@ -78,6 +78,7 @@ def get_count(url: str, where: str = "1=1", timeout: int = 30) -> int:
 
 
 def _fetch_page(
+    client: httpx.Client,
     url: str,
     offset: int,
     chunk_size: int,
@@ -91,6 +92,8 @@ def _fetch_page(
 
     Paramètres
     ----------
+    client : httpx.Client
+        Client HTTP partagé (connection pool, thread-safe).
     url : str
         Endpoint ``/query`` du FeatureServer.
     offset : int
@@ -120,7 +123,7 @@ def _fetch_page(
     """
     for attempt in range(max_retries):
         try:
-            r = requests.get(
+            r = client.get(
                 url,
                 params={
                     "where": where,
@@ -150,7 +153,7 @@ def _fetch_page(
                     len(features),
                 )
             return features
-        except requests.exceptions.RequestException:
+        except httpx.HTTPError:
             if attempt == max_retries - 1:
                 raise
             wait = 2 ** (attempt + 1)
@@ -254,11 +257,20 @@ def fetch_all(
     all_features: list[dict] = []
     lock = threading.Lock()
 
+    # One shared httpx.Client — thread-safe, connection pool sized to max_workers
+    limits = httpx.Limits(
+        max_connections=max_workers,
+        max_keepalive_connections=max_workers,
+    )
     completed = 0
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with (
+        httpx.Client(limits=limits) as client,
+        ThreadPoolExecutor(max_workers=max_workers) as executor,
+    ):
         futures = {
             executor.submit(
                 _fetch_page,
+                client,
                 url,
                 off,
                 chunk_size,
