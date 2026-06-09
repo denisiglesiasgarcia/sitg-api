@@ -36,7 +36,7 @@ URL = "https://vector.sitg.ge.ch/arcgis/rest/services/SCANE_INDICE_MOYENNES_3_AN
 from sitg_api import get_count
 
 print(f"Total: {get_count(URL)}")
-print(f"Genève: {get_count(URL, where="COMMUNE='Genève'")}")
+print(f"Genève: {get_count(URL, where='COMMUNE=\'Genève\'')}")
 ```
 
 ```python
@@ -157,23 +157,74 @@ print(df_pivot_idc_an.head(2))
 
 ## Paramètres de `fetch_all`
 
-| Paramètre      | Défaut  | Description                                                                                      |
-|----------------|---------|--------------------------------------------------------------------------------------------------|
-| `fields`       | `"*"`   | Champs à retourner, ex. `"ID,NOM"`                                                               |
-| `where`        | `"1=1"` | Filtre SQL, ex. `"COMMUNE='Genève'"`                                                             |
-| `with_geometry`| `False` | Inclure la géométrie brute dans chaque feature                                                   |
-| `chunk_size`   | `None`  | Features par requête. `None` = auto-détection depuis les métadonnées du layer (`standardMaxRecordCount × maxRecordCountFactor`) |
-| `max_workers`  | `4`     | Parallélisme des requêtes HTTP                                                                   |
-| `timeout`      | `120`   | Timeout HTTP en secondes                                                                         |
-| `max_retries`  | `4`     | Tentatives max par page avant exception                                                          |
+| Paramètre      | Défaut  | Description |
+|----------------|---------|-------------|
+| `fields`       | `"*"`   | Champs à retourner, ex. `"ID,NOM"` |
+| `where`        | `"1=1"` | Filtre SQL, ex. `"COMMUNE='Genève'"` |
+| `with_geometry`| `False` | Inclure la géométrie brute dans chaque feature |
+| `chunk_size`   | `None`  | Features par requête. `None` = auto-détection depuis les métadonnées du layer (`standardMaxRecordCount x maxRecordCountFactor`) — correspond au maximum autorisé par le serveur avec `resultType=standard` |
+| `max_workers`  | `4`     | Parallélisme des requêtes HTTP |
+| `timeout`      | `120`   | Timeout HTTP en secondes |
+| `max_retries`  | `4`     | Tentatives max par page avant exception |
+| `progress`     | `True`  | Afficher la barre de progression (terminal et Jupyter) |
+| `progress_cb`  | `None`  | Callback `(float 0→1)` pour usage programmatique (ex. Streamlit) |
+| `status_cb`    | `None`  | Callback `(str)` pour messages de statut |
+
+### Barre de progression
+
+La barre s'affiche automatiquement en terminal et en Jupyter (widget HTML via `tqdm.auto`) :
+
+```
+SCANE_INDICE_MOYENNES_3_ANS:  45%|████▌     | 107k/238k [00:08<00:10, 12.8krec/s, pages=6/13]
+```
+
+Pour désactiver :
+
+```python
+features = fetch_all(URL, progress=False)
+```
+
+Pour intégrer dans une UI (Streamlit, Jupyter widget custom…) :
+
+```python
+features = fetch_all(
+    URL,
+    progress=False,
+    progress_cb=lambda frac: print(f"{frac:.0%}"),
+    status_cb=lambda msg: print(msg),
+)
+```
 
 ### Métadonnées du layer
+
+`get_layer_info` retourne les limites de pagination configurées côté serveur, utiles pour comprendre pourquoi `chunk_size` auto-détecté a telle valeur :
 
 ```python
 from sitg_api import get_layer_info
 
 info = get_layer_info(URL)
-print(info["maxRecordCount"])          # limite sans resultType
+print(info["maxRecordCount"])          # limite par défaut (sans resultType)
 print(info["standardMaxRecordCount"]) # limite avec resultType=standard (utilisée par fetch_all)
 print(info["maxRecordCountFactor"])    # multiplicateur configuré côté serveur
 ```
+
+## Développement
+
+```bash
+# Installer les dépendances de développement (pytest, ruff, pre-commit)
+uv sync --all-groups
+
+# Activer les hooks pre-commit (autofix ruff au moment du git commit)
+uv run pre-commit install
+
+# Lancer les tests d'intégration (connexion internet requise — API SITG publique)
+uv run pytest tests/ -v
+
+# Linter + formateur manuellement
+uv run ruff check --fix src/ tests/
+uv run ruff format src/ tests/
+```
+
+Le CI GitHub Actions s'exécute à chaque push :
+1. **Lint** — `ruff format` + `ruff check --fix`, commit automatique des corrections
+2. **Tests** — `pytest` contre l'API SITG réelle

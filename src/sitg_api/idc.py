@@ -27,6 +27,7 @@ import datetime
 import logging
 import re
 from collections.abc import Callable
+from typing import ClassVar
 
 import dataframely as dy
 import polars as pl
@@ -148,7 +149,7 @@ class IDCFetcher:
     """
 
     # Colonnes attendues dans le retour brut de l'API (majuscules) — contrat API
-    _API_COLUMNS: list[str] = [
+    _API_COLUMNS: ClassVar[list[str]] = [
         "EGID",
         "ANNEE",
         "INDICE",
@@ -177,10 +178,10 @@ class IDCFetcher:
     ]
 
     # Colonnes en sortie (minuscules) — doit correspondre aux champs d'IDCSchema
-    _RESULT_COLUMNS: list[str] = [c.lower() for c in _API_COLUMNS]
+    _RESULT_COLUMNS: ClassVar[list[str]] = [c.lower() for c in _API_COLUMNS]
 
     # Mapping renommage API → sortie
-    _RENAME: dict[str, str] = {c: c.lower() for c in _API_COLUMNS}
+    _RENAME: ClassVar[dict[str, str]] = {c: c.lower() for c in _API_COLUMNS}
 
     URL_DEFAULT: str = (
         "https://vector.sitg.ge.ch/arcgis/rest/services/"
@@ -237,9 +238,7 @@ class IDCFetcher:
 
         logger.debug("IDCFetcher.fetch : %d EGIDs uniques demandés", len(egid_list))
 
-        features = self._fetch_raw(
-            egid_list, progress_cb=progress_cb, status_cb=status_cb
-        )
+        features = self._fetch_raw(egid_list, progress_cb=progress_cb, status_cb=status_cb)
 
         # features may be None or contain None entries; guard against that
         safe_features = features or []
@@ -303,9 +302,7 @@ class IDCFetcher:
         features: list[dict] = []
         for chunk in chunks:
             where = (
-                f"EGID IN ({','.join(map(str, chunk))})"
-                if len(chunk) > 1
-                else f"EGID={chunk[0]}"
+                f"EGID IN ({','.join(map(str, chunk))})" if len(chunk) > 1 else f"EGID={chunk[0]}"
             )
             chunk_features = fetch_all(
                 self.url,
@@ -356,8 +353,7 @@ class IDCFetcher:
         Les timestamps ArcGIS arrivent en ms epoch (Int64) → Datetime("ms").
         """
         return (
-            df_raw
-            .rename(self._RENAME)
+            df_raw.rename(self._RENAME)
             .select(self._RESULT_COLUMNS)
             .with_columns(
                 pl.col(
@@ -380,6 +376,17 @@ class IDCFetcher:
                     "date_fin_periode",
                     "date_saisie",
                 ).cast(pl.Datetime("ms")),
+                # Cast nullable string columns explicitly: Polars infers Null dtype
+                # when all values are null (e.g. mono-energy buildings), which
+                # fails dataframely schema validation expecting String.
+                pl.col(
+                    "agent_energetique_2",
+                    "unite_agent_energetique_2",
+                    "agent_energetique_3",
+                    "unite_agent_energetique_3",
+                    "annees_concernees_moy_2",
+                    "annees_concernees_moy_3",
+                ).cast(pl.String),
             )
         )
 
@@ -390,16 +397,13 @@ class IDCFetcher:
         """
         n_before = len(df)
         df_dedup = (
-            df
-            .sort(["egid", "annee", "date_saisie"], descending=[False, False, True])
+            df.sort(["egid", "annee", "date_saisie"], descending=[False, False, True])
             .unique(subset=["egid", "annee"], keep="first")
             .sort(["egid", "annee"])
         )
         return df_dedup, n_before - len(df_dedup)
 
-    def _log_egid_coverage(
-        self, df: pl.DataFrame, egid_set_requested: set[int]
-    ) -> None:
+    def _log_egid_coverage(self, df: pl.DataFrame, egid_set_requested: set[int]) -> None:
         """
         Log les EGIDs demandés sans données IDC retournées.
         Causes légitimes : bâtiment exempté, non assujetti, hors périmètre IDC.
@@ -480,7 +484,7 @@ def pivot_data_idc_an(df: pl.DataFrame) -> pl.DataFrame:
         key=lambda c: (re.sub(r"_\d{4}$", "", c), re.search(r"(\d{4})$", c).group(1)),
     )
 
-    df_pivot_idc_an = df_pivot_idc_an.select(["egid"] + sorted_cols)
+    df_pivot_idc_an = df_pivot_idc_an.select(["egid", *sorted_cols])
 
     return df_pivot_idc_an
 

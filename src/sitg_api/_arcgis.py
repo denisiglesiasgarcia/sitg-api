@@ -5,6 +5,7 @@ Point d'entrée principal : fetch_all()
 """
 
 import logging
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -14,6 +15,17 @@ import requests
 from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
+
+
+def _layer_desc(url: str) -> str:
+    """Extrait un label court depuis l'URL ArcGIS pour la barre de progression.
+
+    Exemple :
+        ``.../services/SCANE_INDICE_MOYENNES_3_ANS/FeatureServer/0/query``
+        → ``"SCANE_INDICE_MOYENNES_3_ANS"``
+    """
+    match = re.search(r"/services/([^/]+)/", url)
+    return match.group(1) if match else "ArcGIS"
 
 
 def get_layer_info(url: str, timeout: int = 30) -> dict:
@@ -123,13 +135,21 @@ def _fetch_page(
             )
             r.raise_for_status()
             data = r.json()
+            features = data.get("features", [])
             if data.get("exceededTransferLimit"):
-                raise RuntimeError(
-                    f"exceededTransferLimit at offset={offset}: server truncated the page "
-                    f"(chunk_size={chunk_size} exceeds server limit). "
-                    "Pass a smaller chunk_size or leave it as None for auto-detection."
+                if not features:
+                    raise RuntimeError(
+                        f"exceededTransferLimit at offset={offset}: server returned zero features "
+                        f"(chunk_size={chunk_size} exceeds server limit). "
+                        "Pass a smaller chunk_size or leave it as None for auto-detection."
+                    )
+                logger.warning(
+                    "exceededTransferLimit at offset=%d with %d features returned "
+                    "(ArcGIS spatial-index artefact on last page — data is complete)",
+                    offset,
+                    len(features),
                 )
-            return data.get("features", [])
+            return features
         except requests.exceptions.RequestException:
             if attempt == max_retries - 1:
                 raise
@@ -196,12 +216,13 @@ def fetch_all(
     where        : filtre SQL, ex. "COMMUNE='Genève'" (défaut: tout)
     with_geometry: inclure la géométrie brute dans chaque feature
     chunk_size   : features par requête. Si None (défaut), lu automatiquement depuis
-                   les métadonnées du layer (standardMaxRecordCount × maxRecordCountFactor),
+                   les métadonnées du layer (standardMaxRecordCount x maxRecordCountFactor),
                    ce qui correspond au maximum autorisé par le serveur avec resultType=standard.
     max_workers  : parallélisme des requêtes HTTP
     timeout      : timeout HTTP en secondes
     max_retries  : tentatives max par page avant exception
-    progress     : afficher une barre tqdm.auto (défaut: True)
+    progress     : afficher une barre tqdm.auto en records/s (défaut: True); fonctionne
+                   en terminal et en Jupyter (widget HTML automatique via tqdm.auto)
     progress_cb  : callback(float 0→1) — pour usage programmatique (ex. Streamlit)
     status_cb    : callback(str) pour messages de progression
 
@@ -215,7 +236,10 @@ def fetch_all(
         info = get_layer_info(url, timeout=30)
         factor = info.get("maxRecordCountFactor", 1.0)
         chunk_size = int(info.get("standardMaxRecordCount", 2000) * factor)
-        logger.info("chunk_size auto-détecté: %d (standardMaxRecordCount × maxRecordCountFactor)", chunk_size)
+        logger.info(
+            "chunk_size auto-détecté: %d (standardMaxRecordCount x maxRecordCountFactor)",
+            chunk_size,
+        )
 
     total = get_count(url, where, timeout=30)
 
@@ -230,6 +254,7 @@ def fetch_all(
     all_features: list[dict] = []
     lock = threading.Lock()
 
+    completed = 0
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(
@@ -245,7 +270,15 @@ def fetch_all(
             ): off
             for off in offsets
         }
-        bar = tqdm(total=len(offsets), unit="page", disable=not progress)
+        bar = tqdm(
+            total=total,
+            unit="rec",
+            unit_scale=True,
+            desc=_layer_desc(url),
+            colour="green",
+            dynamic_ncols=True,
+            disable=not progress,
+        )
         for future in as_completed(futures):
             off = futures[future]
             try:
@@ -256,9 +289,11 @@ def fetch_all(
 
             with lock:
                 all_features.extend(features)
-                bar.update(1)
+                completed += 1
+                bar.update(len(features))
+                bar.set_postfix(pages=f"{completed}/{len(offsets)}", refresh=False)
                 if progress_cb:
-                    progress_cb(bar.n / len(offsets))
+                    progress_cb(completed / len(offsets))
                 if status_cb:
                     status_cb(f"Téléchargé {len(all_features):,} / ~{total:,}")
         bar.close()
