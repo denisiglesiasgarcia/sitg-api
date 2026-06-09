@@ -1,0 +1,9 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.16
+    hooks:
+      # Fix linting issues automatically (imports, unused vars, style…)
+      - id: ruff
+        args: [--fix]
+      # Fix formatting automatically (indentation, quotes, trailing commas…)
+      - id: ruff-format
