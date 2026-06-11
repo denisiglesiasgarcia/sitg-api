@@ -8,6 +8,7 @@ Ils nécessitent une connexion internet.
 import pytest
 
 from sitg_api import fetch_all, get_count, get_layer_info
+from sitg_api._arcgis import _looks_like_json
 
 # Layer IDC — dataset public SITG, ~238k enregistrements
 URL = (
@@ -15,6 +16,11 @@ URL = (
     "SCANE_INDICE_MOYENNES_3_ANS/FeatureServer/0/query"
 )
 BASE_URL = URL.removesuffix("/query")
+
+# Layer SIT_AUTOR_DOSSIER — géométrie ponctuelle (point), pour valider le décodage
+# PBF des points (type esriGeometryTypePoint = 0, omis par proto3).
+URL_AUTOR = "https://vector.sitg.ge.ch/arcgis/rest/services/SIT_AUTOR_DOSSIER/FeatureServer/0/query"
+WHERE_AUTOR_SMALL = "OBJECTID<=2500"
 
 # Filtre sur une petite commune pour limiter le volume dans les tests de fetch
 WHERE_SMALL = "COMMUNE='Avully'"
@@ -243,6 +249,64 @@ class TestFetchAllPbf:
     def test_invalid_response_format_raises(self):
         with pytest.raises(ValueError):
             fetch_all(URL, where=WHERE_SMALL, progress=False, response_format="xml")
+
+    def test_pbf_point_geometry_decoded_as_xy(self):
+        """Les points (type 0, omis en proto3) doivent décoder en {x, y}, pas en rings."""
+        j = fetch_all(
+            URL_AUTOR,
+            where=WHERE_AUTOR_SMALL,
+            fields="ID_DOSSIER",
+            with_geometry=True,
+            progress=False,
+            response_format="json",
+        )
+        p = fetch_all(
+            URL_AUTOR,
+            where=WHERE_AUTOR_SMALL,
+            fields="ID_DOSSIER",
+            with_geometry=True,
+            progress=False,
+            response_format="pbf",
+        )
+
+        def key(f):
+            return f["attributes"]["ID_DOSSIER"]
+
+        jd = {key(f): f["geometry"] for f in j}
+        pd = {key(f): f["geometry"] for f in p}
+        assert set(jd) == set(pd)
+
+        max_diff = 0.0
+        compared = 0
+        for k, gj in jd.items():
+            gp = pd[k]
+            if not gj:
+                continue
+            assert "x" in gp and "y" in gp, f"point décodé sans x/y: {gp}"
+            assert "rings" not in gp
+            max_diff = max(max_diff, abs(gj["x"] - gp["x"]), abs(gj["y"] - gp["y"]))
+            compared += 1
+        assert compared > 0
+        # quantification au cm près — un signe/accumulation erroné donnerait des km
+        assert max_diff < 0.01
+
+
+class TestLooksLikeJson:
+    def test_detects_json_object(self):
+        assert _looks_like_json(b'{"error": {"code": 400}}') is True
+
+    def test_detects_json_array(self):
+        assert _looks_like_json(b"[1, 2, 3]") is True
+
+    def test_detects_leading_whitespace(self):
+        assert _looks_like_json(b'  \n {"a": 1}') is True
+
+    def test_pbf_bytes_not_json(self):
+        # Un FeatureCollectionPBuffer commence par le tag du champ 1 (0x0A), pas '{'
+        assert _looks_like_json(b"\x0a\x03foo") is False
+
+    def test_empty_not_json(self):
+        assert _looks_like_json(b"") is False
 
 
 class TestExceededTransferLimit:
