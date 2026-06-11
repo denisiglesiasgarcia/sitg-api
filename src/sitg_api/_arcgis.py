@@ -19,6 +19,18 @@ from ._pbf import decode_feature_collection
 logger = logging.getLogger(__name__)
 
 
+def _looks_like_json(content: bytes) -> bool:
+    """True if the response body is JSON rather than PBF.
+
+    ArcGIS sometimes returns JSON even when ``f=pbf`` is requested — notably
+    query errors served as HTTP 200 with a ``{"error": ...}`` body. A PBF
+    FeatureCollectionPBuffer never starts with ``{``/``[``, so sniffing the
+    first non-whitespace byte cleanly distinguishes the two.
+    """
+    stripped = content.lstrip()[:1]
+    return stripped in (b"{", b"[")
+
+
 def _layer_desc(url: str) -> str:
     """Extrait un label court depuis l'URL ArcGIS pour la barre de progression.
 
@@ -140,9 +152,12 @@ def _fetch_page(
                 timeout=timeout,
             )
             r.raise_for_status()
-            if response_format == "pbf":
+            if response_format == "pbf" and not _looks_like_json(r.content):
                 features, exceeded = decode_feature_collection(r.content)
             else:
+                # JSON path — also reached when f=pbf was requested but ArcGIS
+                # returned JSON anyway (it does this for query errors served as
+                # HTTP 200, and for layers/params that don't honour pbf).
                 data = r.json()
                 features = data.get("features", [])
                 exceeded = data.get("exceededTransferLimit")
