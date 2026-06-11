@@ -4,7 +4,6 @@ Client générique pour les FeatureServers ArcGIS REST (SITG et compatibles).
 Point d'entrée principal : fetch_all()
 """
 
-import logging
 import re
 import threading
 import time
@@ -12,11 +11,10 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import httpx
+from loguru import logger
 from tqdm.auto import tqdm
 
 from ._pbf import decode_feature_collection
-
-logger = logging.getLogger(__name__)
 
 
 def _looks_like_json(content: bytes) -> bool:
@@ -176,20 +174,21 @@ def _fetch_page(
             # éviter ~1 warning par page.
             if exceeded:
                 logger.debug(
-                    "exceededTransferLimit at offset=%d with %d features (page pleine, normal)",
+                    "exceededTransferLimit at offset={} with {} features (page pleine, normal)",
                     offset,
                     len(features),
                 )
             return features
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
             if attempt == max_retries - 1:
                 raise
             wait = 2 ** (attempt + 1)
             logger.warning(
-                "offset=%d attempt %d/%d, retry in %ds",
+                "offset={} tentative {}/{} échouée ({}), nouvel essai dans {}s",
                 offset,
                 attempt + 1,
                 max_retries,
+                type(exc).__name__,
                 wait,
             )
             time.sleep(wait)
@@ -272,12 +271,15 @@ def fetch_all(
     if response_format not in ("json", "pbf"):
         raise ValueError(f"response_format invalide: {response_format!r} (attendu 'json' ou 'pbf')")
 
+    layer = _layer_desc(url)
+
     if chunk_size is None:
         info = get_layer_info(url, timeout=30)
         factor = info.get("maxRecordCountFactor", 1.0)
         chunk_size = int(info.get("standardMaxRecordCount", 2000) * factor)
-        logger.info(
-            "chunk_size auto-détecté: %d (standardMaxRecordCount x maxRecordCountFactor)",
+        logger.debug(
+            "{}: chunk_size auto-détecté {} (standardMaxRecordCount x maxRecordCountFactor)",
+            layer,
             chunk_size,
         )
 
@@ -287,10 +289,22 @@ def fetch_all(
         status_cb(f"{total:,} enregistrements trouvés — téléchargement...")
 
     if total == 0:
-        logger.warning("Aucun feature retourné pour url=%s where=%s", url, where)
+        logger.warning("{}: aucun feature pour where={!r}", layer, where)
         return []
 
+    started = time.monotonic()
     offsets = list(range(0, total, chunk_size))
+    logger.info(
+        "{}: téléchargement de {:,} features sur {} page(s) "
+        "(chunk={}, workers={}, geometry={}, format={})",
+        layer,
+        total,
+        len(offsets),
+        chunk_size,
+        max_workers,
+        with_geometry,
+        response_format,
+    )
     all_features: list[dict] = []
     lock = threading.Lock()
 
@@ -348,4 +362,13 @@ def fetch_all(
                     status_cb(f"Téléchargé {len(all_features):,} / ~{total:,}")
         bar.close()
 
+    elapsed = time.monotonic() - started
+    rate = len(all_features) / elapsed if elapsed > 0 else 0.0
+    logger.info(
+        "{}: {:,} features téléchargées en {:.1f}s ({:,.0f} rec/s)",
+        layer,
+        len(all_features),
+        elapsed,
+        rate,
+    )
     return all_features

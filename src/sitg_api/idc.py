@@ -24,17 +24,15 @@ Conventions importantes
 """
 
 import datetime
-import logging
 import re
 from collections.abc import Callable
 from typing import ClassVar
 
 import dataframely as dy
 import polars as pl
+from loguru import logger
 
 from ._arcgis import fetch_all
-
-logger = logging.getLogger(__name__)
 
 # Plages valides — invariants métier IDC (module-level pour les règles dy.rule)
 _EGID_MIN: int = 10000
@@ -224,7 +222,7 @@ class IDCFetcher:
         invalid = [v for v in egid_list if not isinstance(v, int)]
         if invalid:
             logger.warning(
-                "IDCFetcher.fetch : %d valeur(s) ignorée(s) — type non entier : %s",
+                "IDCFetcher.fetch : {} valeur(s) ignorée(s) — type non entier : {}",
                 len(invalid),
                 invalid,
             )
@@ -236,7 +234,7 @@ class IDCFetcher:
                 "Aucun EGID valide fourni — tous les éléments doivent être des entiers."
             )
 
-        logger.debug("IDCFetcher.fetch : %d EGIDs uniques demandés", len(egid_list))
+        logger.debug("IDCFetcher.fetch : {} EGIDs uniques demandés", len(egid_list))
 
         features = self._fetch_raw(egid_list, progress_cb=progress_cb, status_cb=status_cb)
 
@@ -255,7 +253,7 @@ class IDCFetcher:
 
         if n_dedup:
             logger.info(
-                "IDCFetcher.fetch : %d doublon(s) supprimé(s) "
+                "IDCFetcher.fetch : {} doublon(s) supprimé(s) "
                 "(même EGID + même année, entrée la plus récente conservée)",
                 n_dedup,
             )
@@ -267,13 +265,13 @@ class IDCFetcher:
 
         if len(failures):
             logger.warning(
-                "IDCFetcher.fetch : %d ligne(s) invalide(s) selon IDCSchema — %s",
+                "IDCFetcher.fetch : {} ligne(s) invalide(s) selon IDCSchema — {}",
                 len(failures),
                 failures.counts(),
             )
 
         logger.info(
-            "IDCFetcher.fetch : %d lignes valides / %d EGIDs couverts / %d demandés",
+            "IDCFetcher.fetch : {} lignes valides / {} EGIDs couverts / {} demandés",
             len(df_valid),
             df_valid["egid"].n_unique(),
             len(egid_list),
@@ -412,7 +410,7 @@ class IDCFetcher:
         egids_missing = egid_set_requested - egids_returned
         if egids_missing:
             logger.warning(
-                "IDCFetcher : %d EGID(s) sans données IDC : %s",
+                "IDCFetcher : {} EGID(s) sans données IDC : {}",
                 len(egids_missing),
                 sorted(egids_missing),
             )
@@ -436,7 +434,7 @@ def fetch_idc_data(
     df, failures = fetcher.fetch(egid, progress_cb=progress_cb, status_cb=status_cb)
     if len(failures) > 0:
         logger.warning(
-            "fetch_idc_data : %d ligne(s) invalide(s) selon IDCSchema — %s",
+            "fetch_idc_data : {} ligne(s) invalide(s) selon IDCSchema — {}",
             len(failures),
             failures.counts(),
         )
@@ -507,7 +505,7 @@ def fetch_idc_data_pivot_egid(
     df, failures = fetcher.fetch(egid, progress_cb=progress_cb, status_cb=status_cb)
     if len(failures) > 0:
         logger.warning(
-            "fetch_idc_data : %d ligne(s) invalide(s) selon IDCSchema — %s",
+            "fetch_idc_data : {} ligne(s) invalide(s) selon IDCSchema — {}",
             len(failures),
             failures.counts(),
         )
