@@ -192,6 +192,11 @@ def _decode_geometry(
     geom_type = _last(f, _GEOM_TYPE)
     if geom_type is None:
         geom_type = default_geom_type
+    if geom_type is None:
+        # proto3 omits fields equal to their default; the GeometryType enum
+        # default is 0 = esriGeometryTypePoint. So an absent type means point
+        # (otherwise points would fall through to the polygon branch below).
+        geom_type = _GT_POINT
     lengths = _unpack_varints(f, _GEOM_LENGTHS)
     coords_zz = _unpack_varints(f, _GEOM_COORDS)
     if not coords_zz:
