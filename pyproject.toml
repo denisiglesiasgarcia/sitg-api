@@ -1,6 +1,6 @@
 [project]
 name = "sitg-api"
-version = "0.1.4"
+version = "0.1.5"
 description = "Client générique pour les APIs ArcGIS REST SITG"
 readme = "README.md"
 requires-python = ">=3.11"
