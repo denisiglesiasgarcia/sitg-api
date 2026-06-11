@@ -14,6 +14,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import httpx
 from tqdm.auto import tqdm
 
+from ._pbf import decode_feature_collection
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,6 +89,7 @@ def _fetch_page(
     with_geometry: bool,
     timeout: int,
     max_retries: int,
+    response_format: str = "json",
 ) -> list[dict]:
     """Récupère une page de features ArcGIS avec stratégie de retry exponentiel.
 
@@ -129,7 +132,7 @@ def _fetch_page(
                     "where": where,
                     "outFields": fields,
                     "returnGeometry": "true" if with_geometry else "false",
-                    "f": "json",
+                    "f": response_format,
                     "resultOffset": offset,
                     "resultRecordCount": chunk_size,
                     "resultType": "standard",
@@ -137,9 +140,13 @@ def _fetch_page(
                 timeout=timeout,
             )
             r.raise_for_status()
-            data = r.json()
-            features = data.get("features", [])
-            if data.get("exceededTransferLimit"):
+            if response_format == "pbf":
+                features, exceeded = decode_feature_collection(r.content)
+            else:
+                data = r.json()
+                features = data.get("features", [])
+                exceeded = data.get("exceededTransferLimit")
+            if exceeded:
                 if not features:
                     raise RuntimeError(
                         f"exceededTransferLimit at offset={offset}: server returned zero features "
@@ -205,6 +212,7 @@ def fetch_all(
     max_workers: int = 4,
     timeout: int = 120,
     max_retries: int = 4,
+    response_format: str = "json",
     progress: bool = True,
     progress_cb: Callable[[float], None] | None = None,
     status_cb: Callable[[str], None] | None = None,
@@ -224,6 +232,11 @@ def fetch_all(
     max_workers  : parallélisme des requêtes HTTP
     timeout      : timeout HTTP en secondes
     max_retries  : tentatives max par page avant exception
+    response_format: format de transport, "json" (défaut) ou "pbf". Le PBF
+                   (Protocol Buffer) est plus compact et rapide à transférer et
+                   décoder ; Esri le recommande plutôt que JSON/geoJSON pour les
+                   performances. La sortie est identique quel que soit le format.
+                   Le layer doit lister "PBF" dans supportedQueryFormats.
     progress     : afficher une barre tqdm.auto en records/s (défaut: True); fonctionne
                    en terminal et en Jupyter (widget HTML automatique via tqdm.auto)
     progress_cb  : callback(float 0→1) — pour usage programmatique (ex. Streamlit)
@@ -235,6 +248,9 @@ def fetch_all(
       - "attributes" : dict des valeurs de champs
       - "geometry"   : dict brut ArcGIS (seulement si with_geometry=True)
     """
+    if response_format not in ("json", "pbf"):
+        raise ValueError(f"response_format invalide: {response_format!r} (attendu 'json' ou 'pbf')")
+
     if chunk_size is None:
         info = get_layer_info(url, timeout=30)
         factor = info.get("maxRecordCountFactor", 1.0)
@@ -279,6 +295,7 @@ def fetch_all(
                 with_geometry,
                 timeout,
                 max_retries,
+                response_format,
             ): off
             for off in offsets
         }

@@ -174,6 +174,77 @@ class TestFetchAll:
 # ---------------------------------------------------------------------------
 
 
+class TestFetchAllPbf:
+    """Le format PBF doit produire exactement la même sortie que JSON."""
+
+    def test_pbf_count_matches_json(self):
+        expected = get_count(URL, where=WHERE_SMALL)
+        features = fetch_all(URL, where=WHERE_SMALL, progress=False, response_format="pbf")
+        assert len(features) == expected
+
+    def test_pbf_attributes_match_json(self):
+        fields = "EGID,ANNEE,COMMUNE"
+        j = fetch_all(URL, where=WHERE_SMALL, fields=fields, progress=False, response_format="json")
+        p = fetch_all(URL, where=WHERE_SMALL, fields=fields, progress=False, response_format="pbf")
+
+        def key(f):
+            return (f["attributes"]["EGID"], f["attributes"]["ANNEE"])
+
+        jd = {key(f): f["attributes"] for f in j}
+        pd = {key(f): f["attributes"] for f in p}
+        assert jd == pd
+
+    def test_pbf_geometry_matches_json(self):
+        fields = "EGID,ANNEE"
+        j = fetch_all(
+            URL,
+            where=WHERE_SMALL,
+            fields=fields,
+            with_geometry=True,
+            progress=False,
+            response_format="json",
+        )
+        p = fetch_all(
+            URL,
+            where=WHERE_SMALL,
+            fields=fields,
+            with_geometry=True,
+            progress=False,
+            response_format="pbf",
+        )
+
+        def key(f):
+            return (f["attributes"]["EGID"], f["attributes"]["ANNEE"])
+
+        jd = {key(f): f["geometry"] for f in j}
+        pd = {key(f): f["geometry"] for f in p}
+        assert set(jd) == set(pd)
+
+        max_diff = 0.0
+        compared_rings = 0
+        for k, gj in jd.items():
+            gp = pd[k]
+            if not gj or "rings" not in gj:
+                continue
+            assert len(gj["rings"]) == len(gp["rings"])
+            for ring_j, ring_p in zip(gj["rings"], gp["rings"], strict=True):
+                assert len(ring_j) == len(ring_p)
+                for (xj, yj), (xp, yp) in zip(ring_j, ring_p, strict=True):
+                    max_diff = max(max_diff, abs(xj - xp), abs(yj - yp))
+                compared_rings += 1
+        assert compared_rings > 0
+        # Quantification au mm près : tout écart > 1cm signalerait un bug de décodage
+        assert max_diff < 0.01
+
+    def test_pbf_no_geometry_when_not_requested(self):
+        features = fetch_all(URL, where=WHERE_SMALL, progress=False, response_format="pbf")
+        assert all(f["geometry"] is None for f in features)
+
+    def test_invalid_response_format_raises(self):
+        with pytest.raises(ValueError):
+            fetch_all(URL, where=WHERE_SMALL, progress=False, response_format="xml")
+
+
 class TestExceededTransferLimit:
     def test_false_positive_does_not_lose_data(self):
         """
