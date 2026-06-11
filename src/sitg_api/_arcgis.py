@@ -146,16 +146,22 @@ def _fetch_page(
                 data = r.json()
                 features = data.get("features", [])
                 exceeded = data.get("exceededTransferLimit")
+            if exceeded and not features:
+                # Zéro feature + exceededTransferLimit => la page demandée dépasse
+                # la limite serveur : erreur réelle de configuration.
+                raise RuntimeError(
+                    f"exceededTransferLimit at offset={offset}: server returned zero features "
+                    f"(chunk_size={chunk_size} exceeds server limit). "
+                    "Pass a smaller chunk_size or leave it as None for auto-detection."
+                )
+            # NB : avec la pagination par resultOffset, ArcGIS positionne
+            # exceededTransferLimit=true sur CHAQUE page pleine (il reste des
+            # lignes au-delà). Ce n'est pas une anomalie — la pagination est
+            # pilotée par get_count(), donc on logue en DEBUG seulement pour
+            # éviter ~1 warning par page.
             if exceeded:
-                if not features:
-                    raise RuntimeError(
-                        f"exceededTransferLimit at offset={offset}: server returned zero features "
-                        f"(chunk_size={chunk_size} exceeds server limit). "
-                        "Pass a smaller chunk_size or leave it as None for auto-detection."
-                    )
-                logger.warning(
-                    "exceededTransferLimit at offset=%d with %d features returned "
-                    "(ArcGIS spatial-index artefact on last page — data is complete)",
+                logger.debug(
+                    "exceededTransferLimit at offset=%d with %d features (page pleine, normal)",
                     offset,
                     len(features),
                 )
