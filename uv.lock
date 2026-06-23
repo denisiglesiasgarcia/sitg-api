@@ -1955,7 +1955,7 @@ wheels = [
 
 [[package]]
 name = "sitg-api"
-version = "0.1.7"
+version = "0.1.8"
 source = { editable = "." }
 dependencies = [
     { name = "bump-my-version" },
