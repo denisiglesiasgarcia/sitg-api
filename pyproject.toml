@@ -1,6 +1,6 @@
 [project]
 name = "sitg-api"
-version = "0.1.6"
+version = "0.1.7"
 description = "Client générique pour les APIs ArcGIS REST SITG"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,6 +17,7 @@ dependencies = [
     "shapely>=2.1.2",
     "tabulate>=0.10.0",
     "tqdm>=4.67.3",
+    "bump-my-version>=1.4.1",
 ]
 
 [build-system]
@@ -64,3 +65,14 @@ dev = [
     "pytest>=9.0.3",
     "ruff>=0.15.12",
 ]
+
+[tool.bumpversion]
+current_version = "0.1.7"
+commit = false
+tag = false
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+regex = true
+search = '^version = "{current_version}"'
+replace = 'version = "{new_version}"'

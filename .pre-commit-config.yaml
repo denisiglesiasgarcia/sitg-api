@@ -1,9 +1,44 @@
+# Pre-commit hooks — ruff only.
+# uv operations (version bump, lock, sync, export) are handled by `make commit`.
+#
+# First-time setup:
+#   pre-commit install
+#   pre-commit autoupdate   # pins ruff rev to its actual latest release
+
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.16
+    rev: v0.15.18
     hooks:
-      # Fix linting issues automatically (imports, unused vars, style…)
+      - id: ruff-format
       - id: ruff
         args: [--fix]
-      # Fix formatting automatically (indentation, quotes, trailing commas…)
-      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: auto-bump-patch
+        name: auto bump patch version
+        language: script
+        entry: scripts/auto_bump_patch.sh
+        stages: [pre-commit]
+        always_run: true
+        pass_filenames: false
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.11.23
+    hooks:
+      - id: uv-export
+        args: ["--frozen", "--output-file=requirements.txt", "--quiet"]
+      - id: uv-lock
+        args: ["--upgrade"]
+      - id: uv-sync
+        args: ["--locked", "--all-packages"]
+
+  - repo: local
+    hooks:
+      - id: tag-version
+        name: tag version after commit
+        language: script
+        entry: scripts/tag_version.sh
+        stages: [post-commit]
+        always_run: true
+        pass_filenames: false
