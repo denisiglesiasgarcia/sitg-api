@@ -1931,7 +1931,7 @@ wheels = [
 
 [[package]]
 name = "sitg-api"
-version = "0.1.12"
+version = "0.1.13"
 source = { editable = "." }
 dependencies = [
     { name = "bump-my-version" },
