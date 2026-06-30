@@ -1,6 +1,6 @@
 [project]
 name = "sitg-api"
-version = "0.1.13"
+version = "0.1.15"
 description = "Client générique pour les APIs ArcGIS REST SITG"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -18,6 +18,8 @@ dependencies = [
     "tabulate>=0.10.0",
     "tqdm>=4.67.3",
     "bump-my-version>=1.4.1",
+    "pyright>=1.1.411",
+    "bandit>=1.9.4",
 ]
 
 [build-system]
@@ -59,6 +61,51 @@ link-mode = "copy"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.mypy]
+python_version = "3.13"
+strict = false
+# Gradually enable these as you add type hints:
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = false   # flip to true once all functions are annotated
+ignore_missing_imports = true   # third-party libs without stubs (streamlit, pymongo…)
+exclude = [
+    "tests/",
+    "mkdocs/",
+]
+
+[tool.pyright]
+pythonVersion = "3.13"
+venvPath = "."
+venv = ".venv"
+exclude = [
+    "tests",
+    "mkdocs",
+    ".venv",
+]
+typeCheckingMode = "basic"   # tighten to "standard"/"strict" once typed up
+reportMissingImports = true
+reportMissingTypeStubs = false   # third-party libs without stubs (streamlit, pymongo…)
+# Codebase has no type hints yet, so pandas/numpy's strict stubs are very noisy.
+# Downgrade to warnings (gradual adoption, same approach as [tool.mypy] above);
+# tighten to "error" once these are cleaned up.
+reportAttributeAccessIssue = "warning"
+reportReturnType = "warning"
+reportCallIssue = "warning"
+reportArgumentType = "warning"
+reportOptionalSubscript = "warning"
+reportAssignmentType = "warning"
+reportGeneralTypeIssues = "warning"
+reportOperatorIssue = "warning"
+
+[tool.bandit]
+exclude_dirs = ["tests", "mkdocs"]
+skips = [
+    "B101",  # assert statements — fine in tests/application code here
+]
+severity = "medium"   # report medium and high findings only
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.0",
@@ -67,7 +114,7 @@ dev = [
 ]
 
 [tool.bumpversion]
-current_version = "0.1.13"
+current_version = "0.1.15"
 commit = false
 tag = false
 
