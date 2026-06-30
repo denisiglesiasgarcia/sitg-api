@@ -1,9 +1,13 @@
-# Pre-commit hooks — ruff, gitleaks, bandit, pyright.
+# Pre-commit hooks — ruff, gitleaks, bandit, ty.
 # uv operations (version bump, lock, sync, export) are handled by `make commit`.
 #
-# First-time setup:
+# This file is synced into target repos by repo-file-sync-action — see
+# .github/sync.yml in this repo. Don't edit it directly in a target repo;
+# edit it here and let the sync PR carry the change out.
+#
+# First-time setup (per repo):
 #   pre-commit install
-#   pre-commit autoupdate   # pins ruff rev to its actual latest release
+#   pre-commit autoupdate   # pins hook revs to their actual latest release
 
 repos:
   - repo: https://github.com/gitleaks/gitleaks
@@ -25,10 +29,15 @@ repos:
         args: ["-c", "pyproject.toml"]
         additional_dependencies: ["bandit[toml]"]
 
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.411
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    rev: v0.0.55
     hooks:
-      - id: pyright
+      - id: ty
+        # Override the default `uv check` entry: it exits non-zero on any
+        # diagnostic, ignoring per-rule severity. Call `ty` directly so rules
+        # downgraded to "warn" in [tool.ty.rules] stay visible but non-blocking.
+        entry: ty check --exit-zero-on-warning
+        additional_dependencies: ["ty==0.0.55"]
 
   - repo: local
     hooks:
