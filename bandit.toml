@@ -1,0 +1,6 @@
+[tool.bandit]
+exclude_dirs = ["tests", "mkdocs"]
+skips = [
+    "B101",  # assert statements — fine in tests/application code here
+]
+severity = "medium"   # report medium and high findings only

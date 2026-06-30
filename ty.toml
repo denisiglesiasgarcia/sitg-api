@@ -1,0 +1,19 @@
+[environment]
+python-version = "3.13"
+python = ".venv"
+
+[src]
+exclude = [
+    "tests",
+    "mkdocs",
+]
+
+[rules]
+# Most repos have no type hints yet; pandas/numpy stubs and untyped legacy code
+# produce real (pre-existing) findings rather than noise. Downgrade to warnings
+# for gradual adoption; tighten to "error" per-repo once these are cleaned up.
+call-non-callable = "warn"
+invalid-argument-type = "warn"
+missing-argument = "warn"
+unresolved-attribute = "warn"
+unsupported-operator = "warn"
