@@ -1,5 +1,6 @@
 # Pre-commit hooks — ruff, gitleaks, bandit, ty.
-# uv operations (version bump, lock, sync, export) are handled by `make commit`.
+# uv operations (version bump, lock, sync, export) run automatically as
+# hooks below on every `git commit` (which `make commit` just wraps).
 #
 # This file is synced into target repos by repo-file-sync-action — see
 # .github/sync.yml in this repo. Don't edit it directly in a target repo;
@@ -52,10 +53,12 @@ repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.11.25
     hooks:
-      - id: uv-export
-        args: ["--frozen", "--output-file=requirements.txt", "--quiet"]
+      # uv-lock must run before uv-export: otherwise requirements.txt is
+      # exported from the pre-upgrade lock and drifts from the final uv.lock.
       - id: uv-lock
         args: ["--upgrade"]
+      - id: uv-export
+        args: ["--frozen", "--output-file=requirements.txt", "--quiet"]
       - id: uv-sync
         args: ["--locked", "--all-packages"]
 
