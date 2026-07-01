@@ -416,16 +416,16 @@ class IDCFetcher:
             )
 
 
-def fetch_idc_data(
+def _fetch_and_validate(
     egid: int | list[int],
     *,
-    url: str = IDCFetcher.URL_DEFAULT,
-    chunk_size: int = 1000,
-    egid_chunk_size: int = 50,
-    progress_cb: Callable[[float], None] | None = None,
-    status_cb: Callable[[str], None] | None = None,
-) -> tuple[dy.DataFrame[IDCSchema], dy.FailureInfo] | None:
-
+    url: str,
+    chunk_size: int,
+    egid_chunk_size: int,
+    progress_cb: Callable[[float], None] | None,
+    status_cb: Callable[[str], None] | None,
+) -> tuple[dy.DataFrame[IDCSchema], dy.FailureInfo]:
+    """Construit un IDCFetcher, récupère les données et lève si des lignes sont invalides."""
     fetcher = IDCFetcher(
         url=url,
         chunk_size=chunk_size,
@@ -440,6 +440,25 @@ def fetch_idc_data(
         )
         raise ValueError(f"{len(failures)} ligne(s) invalide(s), vérifier schéma.")
     return df, failures
+
+
+def fetch_idc_data(
+    egid: int | list[int],
+    *,
+    url: str = IDCFetcher.URL_DEFAULT,
+    chunk_size: int = 1000,
+    egid_chunk_size: int = 50,
+    progress_cb: Callable[[float], None] | None = None,
+    status_cb: Callable[[str], None] | None = None,
+) -> tuple[dy.DataFrame[IDCSchema], dy.FailureInfo]:
+    return _fetch_and_validate(
+        egid,
+        url=url,
+        chunk_size=chunk_size,
+        egid_chunk_size=egid_chunk_size,
+        progress_cb=progress_cb,
+        status_cb=status_cb,
+    )
 
 
 # ---------------------------------------------
@@ -498,20 +517,12 @@ def fetch_idc_data_pivot_egid(
     progress_cb: Callable[[float], None] | None = None,
     status_cb: Callable[[str], None] | None = None,
 ) -> pl.DataFrame:
-
-    fetcher = IDCFetcher(
+    df, _failures = _fetch_and_validate(
+        egid,
         url=url,
         chunk_size=chunk_size,
         egid_chunk_size=egid_chunk_size,
+        progress_cb=progress_cb,
+        status_cb=status_cb,
     )
-    df, failures = fetcher.fetch(egid, progress_cb=progress_cb, status_cb=status_cb)
-    if len(failures) > 0:
-        logger.warning(
-            "fetch_idc_data : {} ligne(s) invalide(s) selon IDCSchema — {}",
-            len(failures),
-            failures.counts(),
-        )
-        raise ValueError(f"{len(failures)} ligne(s) invalide(s), vérifier schéma.")
-    df_pivot_idc_an: pl.DataFrame = pivot_data_idc_an(df)
-
-    return df_pivot_idc_an
+    return pivot_data_idc_an(df)

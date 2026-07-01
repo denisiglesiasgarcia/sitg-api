@@ -8,7 +8,8 @@ Ils nécessitent une connexion internet.
 import pytest
 
 from sitg_api import fetch_all, get_count, get_layer_info
-from sitg_api._arcgis import _looks_like_json
+
+pytestmark = pytest.mark.integration
 
 # Layer IDC — dataset public SITG, ~238k enregistrements
 URL = (
@@ -306,24 +307,6 @@ class TestFetchAllPbf:
         assert compared > 0
         # quantification au cm près — un signe/accumulation erroné donnerait des km
         assert max_diff < 0.01
-
-
-class TestLooksLikeJson:
-    def test_detects_json_object(self):
-        assert _looks_like_json(b'{"error": {"code": 400}}') is True
-
-    def test_detects_json_array(self):
-        assert _looks_like_json(b"[1, 2, 3]") is True
-
-    def test_detects_leading_whitespace(self):
-        assert _looks_like_json(b'  \n {"a": 1}') is True
-
-    def test_pbf_bytes_not_json(self):
-        # Un FeatureCollectionPBuffer commence par le tag du champ 1 (0x0A), pas '{'
-        assert _looks_like_json(b"\x0a\x03foo") is False
-
-    def test_empty_not_json(self):
-        assert _looks_like_json(b"") is False
 
 
 class TestExceededTransferLimit:

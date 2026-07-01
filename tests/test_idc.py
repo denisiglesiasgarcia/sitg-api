@@ -10,6 +10,8 @@ import pytest
 
 from sitg_api.idc import _ANNEE_MAX, IDCFetcher
 
+pytestmark = pytest.mark.integration
+
 # EGIDs connus dans le dataset IDC SITG (immeuble Avenue Giuseppe-Motta 30, Genève)
 EGID_KNOWN = [1015052, 1015054]
 EGID_SINGLE = 1015052

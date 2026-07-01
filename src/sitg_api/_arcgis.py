@@ -4,6 +4,7 @@ Client générique pour les FeatureServers ArcGIS REST (SITG et compatibles).
 Point d'entrée principal : fetch_all()
 """
 
+import random
 import re
 import threading
 import time
@@ -131,8 +132,9 @@ def _fetch_page(
 
     Notes
     -----
-    En cas d'échec, la temporisation suit ``2^(attempt+1)`` secondes avant
-    nouvelle tentative. La dernière erreur est propagée.
+    En cas d'échec, la temporisation suit ``2^(attempt+1)`` secondes (+/- 20% de
+    jitter, pour éviter que les workers en échec ne retentent tous en même
+    temps) avant nouvelle tentative. La dernière erreur est propagée.
     """
     for attempt in range(max_retries):
         try:
@@ -182,7 +184,7 @@ def _fetch_page(
         except httpx.HTTPError as exc:
             if attempt == max_retries - 1:
                 raise
-            wait = 2 ** (attempt + 1)
+            wait = 2 ** (attempt + 1) * random.uniform(0.8, 1.2)  # nosec B311 - retry jitter, not crypto
             logger.warning(
                 "offset={} tentative {}/{} échouée ({}), nouvel essai dans {}s",
                 offset,
@@ -267,6 +269,11 @@ def fetch_all(
     Liste de dicts, chacun avec :
       - "attributes" : dict des valeurs de champs
       - "geometry"   : dict brut ArcGIS (seulement si with_geometry=True)
+
+    Note : les pages sont récupérées en parallèle, donc l'ordre des features
+    dans la liste retournée reflète l'ordre de complétion des requêtes, pas
+    l'ordre de pagination ArcGIS (resultOffset). Trier explicitement si un
+    ordre stable est nécessaire.
     """
     if response_format not in ("json", "pbf"):
         raise ValueError(f"response_format invalide: {response_format!r} (attendu 'json' ou 'pbf')")
