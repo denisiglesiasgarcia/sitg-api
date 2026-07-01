@@ -32,6 +32,7 @@ class TestStageProgress:
     def test_rescales_into_subrange(self):
         seen = []
         cb = stage_progress(seen.append, 0.5, 1.0)
+        assert cb is not None
         cb(0.0)
         cb(1.0)
         assert seen == [0.5, 1.0]

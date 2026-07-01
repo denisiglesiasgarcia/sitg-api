@@ -1,6 +1,6 @@
 [project]
 name = "sitg-api"
-version = "0.1.23"
+version = "0.1.24"
 description = "Client générique pour les APIs ArcGIS REST SITG"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -78,7 +78,7 @@ dev = [
 ]
 
 [tool.bumpversion]
-current_version = "0.1.23"
+current_version = "0.1.24"
 commit = false
 tag = false
 
