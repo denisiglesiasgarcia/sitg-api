@@ -6,6 +6,7 @@ python = ".venv"
 exclude = [
     "tests",
     "mkdocs",
+    "**/*.ipynb",   # Jupyter built-ins like display() aren't known to ty
 ]
 
 [rules]

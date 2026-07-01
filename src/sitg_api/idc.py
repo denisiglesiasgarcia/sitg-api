@@ -476,11 +476,13 @@ def pivot_data_idc_an(df: pl.DataFrame) -> pl.DataFrame:
 
     non_index = [c for c in df_pivot_idc_an.columns if c != "egid"]
 
+    def _sort_key(c: str) -> tuple[str, str]:
+        year_match = re.search(r"(\d{4})$", c)
+        year = year_match.group(1) if year_match else ""
+        return (re.sub(r"_\d{4}$", "", c), year)
+
     # Sort by (variable_name, year) — groups all years per variable, chronologically
-    sorted_cols = sorted(
-        non_index,
-        key=lambda c: (re.sub(r"_\d{4}$", "", c), re.search(r"(\d{4})$", c).group(1)),
-    )
+    sorted_cols = sorted(non_index, key=_sort_key)
 
     df_pivot_idc_an = df_pivot_idc_an.select(["egid", *sorted_cols])
 

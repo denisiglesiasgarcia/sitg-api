@@ -18,6 +18,7 @@ Point d'entrée : :func:`decode_feature_collection`.
 """
 
 import struct
+from typing import Any
 
 # Numéros de champs (cf. FeatureCollection.proto)
 _FC_QUERY_RESULT = 2
@@ -237,6 +238,7 @@ def _decode_geometry(
     else:
         parts = [vertices]
 
+    out: dict[str, Any]
     if geom_type == _GT_MULTIPOINT:
         out = {"points": [v for part in parts for v in part]}
     elif geom_type == _GT_POLYLINE:
